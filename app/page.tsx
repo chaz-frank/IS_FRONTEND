@@ -1,31 +1,11 @@
 'use client'
-import { SKILL_GET, SKILL_POST } from './utils/api_calls';
 import { useState, useEffect } from 'react';
-
-interface Skill {
-	name: string;
-	description: string;
-}
-
-async function getSkills(): Promise<Skill[]> {
-	let skills: Skill[] = [];
-
-	const response = await fetch(SKILL_GET());
-	if (response.ok) {
-		const json = await response.json();
-		if (json.length > 0) {
-			skills = json;
-		} else {
-			console.error('Empty JSON response');
-		}
-	} else {
-		console.error(`Error fetching data: ${response.status}`);
-	}
-	return skills;
-}
+import type { Skill } from './utils/interfaces';
+import { getSkills, postSkill, trackSkill } from './utils/api_functions';
 
 export default function Page() {
 	const [skills, setSkills] = useState<Skill[]>([]);
+	const [display, setDisplay] = useState<string>('none');
 
 	useEffect(() => {
 		(async () => {
@@ -37,40 +17,43 @@ export default function Page() {
 	const onFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const formData = new FormData(event.currentTarget);
-		const name = formData.get('name');
-		const description = formData.get('description');
-		const body = JSON.stringify({name, description});
-		const res = await fetch(SKILL_POST(), {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: body,
-		});
+		const name = formData.get('name') as string;
+		const description = formData.get('description') as string;
 
-		if (res.ok) {
-			const fetchedSkills = await getSkills();
-			setSkills(fetchedSkills);
-		} else {
-			console.error(`Error submitting form: ${res.status}`);
+		if (name && description) {
+			const skill = await postSkill({ name, description });
+			setSkills(prevSkills => [...prevSkills, skill]);
+			setDisplay('none');
 		}
 	};
 
-
 	return (
-		<div>
-			<form onSubmit={onFormSubmit}>
-				<label>Name: </label>
-				<input type="text" name="name" />
-				<label>Description: </label>
-				<input type="text" name="description" />
-				<button type="submit">Submit</button>
-			</form>
-			<ul>
-				{skills.map((skill) => (
-					<li key={skill.name}>{skill.name}: {skill.description}</li>
+		<div className="container">
+			<dialog className="container" style={{ display: `${display}` }}>
+				<form onSubmit={onFormSubmit}>
+					<label>Name: </label>
+					<input type="text" name="name" required />
+					<label>Description: </label>
+					<input type="text" name="description" required />
+					<button type="submit">Submit</button>
+					<button type="button" onClick={() => setDisplay('none')}>Cancel</button>
+				</form>
+			</dialog>
+			<h2>List of Skills:</h2>
+			<div className="container">
+				{skills.map((skill, i) => (
+					<div key={skill._id}>
+						<h3>
+							{skill.name} - <button onClick={async () => {
+								await trackSkill(skill._id);
+								const fetchedSkills = await getSkills();
+								setSkills(fetchedSkills);
+							}}>Tracking: {skill.tracking ? 'Yes' : 'No'}</button>
+						</h3>
+					</div>
 				))}
-			</ul>
+			</div>
+			<button onClick={() => setDisplay('block')}>Add Skill</button>
 		</div>
 	);
 }
